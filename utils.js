@@ -1,10 +1,10 @@
 import { ethers } from "ethers";
-import { POOL_ABI } from "./abis/pool";
-import { ETH_PROVIDER, SWAP_ROUTER, USER, Wallet } from "./constansts";
-import { ERC20_ABI } from "./abis/erc20";
-import { aggregatorV3InterfaceABI } from "./abis/aggregator";
-import { SWAP_ROUTER_ABI } from "./abis/swapRouter";
-const BigNumber = require('bignumber.js');
+import { POOL_ABI } from "./abis/pool.js";
+import { ETH_PROVIDER, SWAP_ROUTER, USER, Wallet } from "./constansts.js";
+import { ERC20_ABI } from "./abis/erc20.js";
+import { aggregatorV3InterfaceABI } from "./abis/aggregator.js";
+import { SWAP_ROUTER_ABI } from "./abis/swapRouter.js";
+import BigNumber from "bignumber.js";
 
 BigNumber.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
 
@@ -14,10 +14,10 @@ export async function getPoolData(poolAddress) {
     var token0 = await pool.token0();
     var token1 = await pool.token1();
     var fee = await pool.fee();
-    var liquidity = await pool.liquidity();
+    var liquidity = (await pool.liquidity()).toString();
     var slot0 = await pool.slot0();
 
-    var sqrtPriceX96 = slot0.sqrtPriceX96;
+    var sqrtPriceX96 = slot0.sqrtPriceX96.toString();
 
     var token0Contract = new ethers.Contract(token0, ERC20_ABI, ETH_PROVIDER);
     var token1Contract = new ethers.Contract(token1, ERC20_ABI, ETH_PROVIDER);
@@ -84,13 +84,13 @@ export async function getChainlinkPrice(aggregatorToken0, aggregatorToken1, toke
     console.log("Prices of token0 and token1:", price0.toString(), price1.toString());
 
     // Calculate the ratio
-    let ratio = price1.mul(ethers.BigNumber.from('1e18')).mul(ethers.BigNumber.from(10).pow(token1Decimals))
+    let ratio = price1.mul(ethers.BigNumber.from('1000000000000000000')).mul(ethers.BigNumber.from(10).pow(token1Decimals))
         .div(price0.mul(ethers.BigNumber.from(10).pow(token0Decimals)));
 
     console.log("Initial ratio:", price0.toString(), price1.toString(), ratio.toString());
 
     if (price0.gt(price1)) {
-        ratio = ethers.BigNumber.from('1e18').mul(ethers.BigNumber.from(10).pow(token1Decimals * 2))
+        ratio = ethers.BigNumber.from('1000000000000000000').mul(ethers.BigNumber.from(10).pow(token1Decimals * 2))
             .div(ratio).div(ethers.BigNumber.from(10).pow(token0Decimals));
         console.log("Inverted ratio:", ratio.toString());
     }
