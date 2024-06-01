@@ -16,8 +16,9 @@ async function syncPrice(pool) {
 
     console.log("poolData: ", poolData);
 
-    var uniswapPrice = await getUniswapPrice(poolData.sqrtPriceX96);
+    var uniswapPrice = await getUniswapPrice(poolData.sqrtPriceX96, poolData.token0Decimal, poolData.token1Decimal);
 
+    // amount of token1 for token0 sclaed up by 1e18
     console.log("uniswapPrice: ", uniswapPrice);
 
     var chainlinkPrice = await getChainlinkPrice(

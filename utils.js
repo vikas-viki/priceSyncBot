@@ -35,21 +35,37 @@ export async function getPoolData(poolAddress) {
     };
 }
 
-export async function getUniswapPrice(_sqrtPrice) {
+// amount of token1 for 1 token0
+export async function getUniswapPrice(_sqrtPrice, decimal0, decimal1) {
     // Convert the input sqrtPrice to a BigNumber
     const sqrtPriceX96 = new BigNumber(_sqrtPrice);
 
+    console.log(sqrtPriceX96);
     // Square the sqrtPriceX96
-    const priceX96 = sqrtPriceX96.pow(2);
 
-    // Multiply by 10^18
-    const priceX96scaled = priceX96.multipliedBy(new BigNumber('1e18'));
+    const sqrtPrice = sqrtPriceX96.dividedBy(new BigNumber("2").pow("96"));
 
-    // Shift right by 192 bits (96 * 2)
-    const price = priceX96scaled.shiftedBy(-192);
+    console.log("sqrtPrice: ", sqrtPrice);
 
+    const price = sqrtPrice.pow(2);
+
+    console.log("price: ", price);
+
+    const diff = Math.abs(decimal0 - decimal1);
+
+    const decimalDiff = new BigNumber("10").pow(diff);
+
+    console.log("decimalDiff: ", decimalDiff);
+
+    const amountOfToken1For1Token0 = price.div(decimalDiff);
+
+    console.log("amountOfToken1For1Token0: ", amountOfToken1For1Token0);
+
+    const amountScaled = amountOfToken1For1Token0.multipliedBy(new BigNumber('10').pow('18'));
+
+    console.log("amountScaled: ", amountScaled);
     // Return the price
-    return price.toFixed(); // toFixed() to convert the result to a string
+    return amountScaled.decimalPlaces(0); // toFixed() to convert the result to a string
 }
 
 /**
@@ -78,24 +94,27 @@ export async function getChainlinkPrice(aggregatorToken0, aggregatorToken1, toke
     const roundDataToken1 = await priceFeedToken1.latestRoundData();
 
     // Extract the price from round data
-    const price0 = ethers.BigNumber.from(roundDataToken0.answer);
-    const price1 = ethers.BigNumber.from(roundDataToken1.answer);
+    const price0 = new BigNumber(roundDataToken0.answer.toString());
+    const price1 = new BigNumber(roundDataToken1.answer.toString());
 
     console.log("Prices of token0 and token1:", price0.toString(), price1.toString());
 
-    // Calculate the ratio
-    let ratio = price1.mul(ethers.BigNumber.from('1000000000000000000')).mul(ethers.BigNumber.from(10).pow(token1Decimals))
-        .div(price0.mul(ethers.BigNumber.from(10).pow(token0Decimals)));
+    var ratio = price0.div(price1);
 
-    console.log("Initial ratio:", price0.toString(), price1.toString(), ratio.toString());
+    console.log("ratio: ", ratio);
 
-    if (price0.gt(price1)) {
-        ratio = ethers.BigNumber.from('1000000000000000000').mul(ethers.BigNumber.from(10).pow(token1Decimals * 2))
-            .div(ratio).div(ethers.BigNumber.from(10).pow(token0Decimals));
-        console.log("Inverted ratio:", ratio.toString());
-    }
+    var sclaedRatio = ratio.multipliedBy(new BigNumber('10').pow(18)).decimalPlaces(0);
 
-    return ratio;
+    // if (price0.gt(price1)) {
+    //     // ratio = (ethers.BigNumber.from('1000000000000000000').div(ratio))
+    //     //     .mul(ethers.BigNumber.from(10).pow(token1Decimals).div(ethers.BigNumber.from(10).pow(token0Decimals)));
+
+    //     ratio = ethers.BigNumber.from('1000000000000000000').mul(ethers.BigNumber.from(10).pow(token1Decimals).mul(ethers.BigNumber.from(10).pow(token1Decimals)))
+    //         .div(ratio).div(ethers.BigNumber.from(10).pow(token0Decimals));
+    //     console.log("Inverted ratio:", ratio.toString());
+    // }
+
+    return sclaedRatio;
 }
 
 
