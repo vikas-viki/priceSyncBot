@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import { POOL_ABI } from "./abis/pool.js";
-import { ETH_PROVIDER, SWAP_ROUTER, USER, Wallet } from "./constansts.js";
+import { ETH_PROVIDER, LOCAL_PROVIDER, USER, Wallet } from "./constansts.js";
+import { SWAP_ROUTER } from "./index.js";
 import { ERC20_ABI } from "./abis/erc20.js";
 import { aggregatorV3InterfaceABI } from "./abis/aggregator.js";
 import { SWAP_ROUTER_ABI } from "./abis/swapRouter.js";
@@ -9,7 +10,7 @@ import BigNumber from "bignumber.js";
 BigNumber.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
 
 export async function getPoolData(poolAddress) {
-    var pool = new ethers.Contract(poolAddress, POOL_ABI, ETH_PROVIDER);
+    var pool = new ethers.Contract(poolAddress, POOL_ABI, LOCAL_PROVIDER);
 
     var token0 = await pool.token0();
     var token1 = await pool.token1();
@@ -19,10 +20,12 @@ export async function getPoolData(poolAddress) {
 
     var sqrtPriceX96 = slot0.sqrtPriceX96.toString();
 
-    var token0Contract = new ethers.Contract(token0, ERC20_ABI, ETH_PROVIDER);
-    var token1Contract = new ethers.Contract(token1, ERC20_ABI, ETH_PROVIDER);
+    var token0Contract = new ethers.Contract(token0, ERC20_ABI, LOCAL_PROVIDER);
+    var token1Contract = new ethers.Contract(token1, ERC20_ABI, LOCAL_PROVIDER);
     var token0Decimal = await token0Contract.decimals();
     var token1Decimal = await token1Contract.decimals();
+    var token0Symbol = await token0Contract.symbol();
+    var token1Symbol = await token1Contract.symbol();
 
     return {
         token0,
@@ -31,9 +34,13 @@ export async function getPoolData(poolAddress) {
         token1Decimal,
         liquidity,
         fee,
-        sqrtPriceX96
+        sqrtPriceX96,
+        token0Symbol,
+        token1Symbol
     };
 }
+
+var upscale = false;
 
 // amount of token1 for 1 token0
 export async function getUniswapPrice(_sqrtPrice, decimal0, decimal1) {
@@ -51,21 +58,28 @@ export async function getUniswapPrice(_sqrtPrice, decimal0, decimal1) {
 
     console.log("price: ", price);
 
+    var amountOfToken1For1Token0;
+
     const diff = Math.abs(decimal0 - decimal1);
 
     const decimalDiff = new BigNumber("10").pow(diff);
 
-    console.log("decimalDiff: ", decimalDiff);
+    if (price.lt(1)) {
+        amountOfToken1For1Token0 = price.multipliedBy(decimalDiff);
+    } else {
+        amountOfToken1For1Token0 = price.dividedBy(decimalDiff);
+    }
 
-    const amountOfToken1For1Token0 = price.div(decimalDiff);
+    if (upscale) {
+        amountOfToken1For1Token0 = amountOfToken1For1Token0.multipliedBy(decimalDiff);
+    }
 
     console.log("amountOfToken1For1Token0: ", amountOfToken1For1Token0);
+    // const amountScaled = amountOfToken1For1Token0.multipliedBy(new BigNumber('10').pow('18'));
 
-    const amountScaled = amountOfToken1For1Token0.multipliedBy(new BigNumber('10').pow('18'));
-
-    console.log("amountScaled: ", amountScaled);
+    // console.log("amountScaled: ", amountScaled);
     // Return the price
-    return amountScaled.decimalPlaces(0); // toFixed() to convert the result to a string
+    return amountOfToken1For1Token0; // toFixed() to convert the result to a string
 }
 
 /**
@@ -74,14 +88,7 @@ export async function getUniswapPrice(_sqrtPrice, decimal0, decimal1) {
  * @returns {BigNumber} - The integer square root of x.
  */
 function sqrt(value) {
-    let x = new BigNumber(value);
-    let z = x.plus(1).div(2);
-    let y = x;
-    while (z.isLessThan(y)) {
-        y = z;
-        z = x.div(z).plus(z).div(2);
-    }
-    return y;
+    return value ** 0.5;
 }
 
 export async function getChainlinkPrice(aggregatorToken0, aggregatorToken1, token0Decimals, token1Decimals) {
@@ -89,6 +96,7 @@ export async function getChainlinkPrice(aggregatorToken0, aggregatorToken1, toke
     const priceFeedToken0 = new ethers.Contract(aggregatorToken0, aggregatorV3InterfaceABI, ETH_PROVIDER);
     const priceFeedToken1 = new ethers.Contract(aggregatorToken1, aggregatorV3InterfaceABI, ETH_PROVIDER);
 
+    console.log("getting data");
     // Fetch latest round data for both tokens
     const roundDataToken0 = await priceFeedToken0.latestRoundData();
     const roundDataToken1 = await priceFeedToken1.latestRoundData();
@@ -103,18 +111,17 @@ export async function getChainlinkPrice(aggregatorToken0, aggregatorToken1, toke
 
     console.log("ratio: ", ratio);
 
-    var sclaedRatio = ratio.multipliedBy(new BigNumber('10').pow(18)).decimalPlaces(0);
+    const diff = Math.abs(token0Decimals - token1Decimals);
 
-    // if (price0.gt(price1)) {
-    //     // ratio = (ethers.BigNumber.from('1000000000000000000').div(ratio))
-    //     //     .mul(ethers.BigNumber.from(10).pow(token1Decimals).div(ethers.BigNumber.from(10).pow(token0Decimals)));
+    const decimalDiff = new BigNumber("10").pow(diff);
 
-    //     ratio = ethers.BigNumber.from('1000000000000000000').mul(ethers.BigNumber.from(10).pow(token1Decimals).mul(ethers.BigNumber.from(10).pow(token1Decimals)))
-    //         .div(ratio).div(ethers.BigNumber.from(10).pow(token0Decimals));
-    //     console.log("Inverted ratio:", ratio.toString());
-    // }
+    if (upscale) {
+        ratio = ratio.multipliedBy(decimalDiff);
+    }
 
-    return sclaedRatio;
+    console.log("amountOfToken1For1Token0: ", ratio);
+
+    return ratio;
 }
 
 
@@ -129,14 +136,24 @@ export function estimateTokensToSwap(liquidity, chainLinkPrice, uniswapPrice, is
     console.log("sqrtPrices:", sqrtUni.toString(), sqrtChainLink.toString());
 
     if (isToken0In) {
-        const delX = bnLiquidity.multipliedBy(sqrtChainLink)
-            .minus(bnLiquidity.multipliedBy(sqrtUni))
-            .dividedBy(sqrtChainLink.multipliedBy(sqrtUni));
+        console.log("bnLiquidity: ", bnLiquidity);
+        const desiredRatio = bnLiquidity.div(sqrtChainLink);
+        console.log("desiredRatio: ", desiredRatio);
+        const currentRatio = bnLiquidity.div(sqrtUni);
+        console.log("currentRatio: ", currentRatio);
+
+        const delX = desiredRatio.minus(currentRatio);
+
         console.log("DeltaX", delX.toString());
         return delX;
     } else {
-        const delY = bnLiquidity.multipliedBy(sqrtChainLink)
-            .minus(bnLiquidity.multipliedBy(sqrtUni));
+        console.log("bnLiquidity: ", bnLiquidity);
+        const desiredRatio = bnLiquidity.multipliedBy(sqrtChainLink);
+        console.log("desiredRatio: ", desiredRatio);
+        const currentRatio = bnLiquidity.multipliedBy(sqrtUni);
+        console.log("currentRatio: ", currentRatio);
+
+        const delY = desiredRatio.minus(currentRatio);
         console.log("DeltaY:", delY.toString());
         return delY;
     }
@@ -148,12 +165,12 @@ export async function swapExactInputSingleHop(
     poolFee,
     amountIn
 ) {
-    var tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, ETH_PROVIDER);
+    var tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, Wallet);
 
     await tokenInContract.mint(amountIn);
     await tokenInContract.approve(SWAP_ROUTER, amountIn);
 
-    var swapRouter = new ethers.Contract(SWAP_ROUTER, SWAP_ROUTER_ABI, Wallet);
+    var swapRouter = new ethers.Contract(SWAP_ROUTER.toString(), SWAP_ROUTER_ABI, Wallet);
 
     var currentTimeStamp = Math.floor(Date.now() / 1000);
 
@@ -162,11 +179,11 @@ export async function swapExactInputSingleHop(
         tokenOut: tokenOut,
         fee: poolFee,
         recipient: USER,
-        deadline: currentTimeStamp,
+        deadline: currentTimeStamp * 2,
         amountIn: amountIn,
         amountOutMinimum: 0,
         sqrtPriceLimitX96: 0
-    })
+    });
 
     return amountOut;
 }
