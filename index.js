@@ -1,7 +1,8 @@
+import { ethers } from "ethers";
 import { estimateTokensToSwap, getChainlinkPrice, getPoolData, getUniswapPrice, swapExactInputSingleHop } from "./utils.js";
 
 const uniswap_pool = "0xCBCdF9626bC03E24f779434178A73a0B4bad62eD";
-const local_pool = "0x589D9db904F35268C3Ed8AbB4f2367eE6B5B1Ffd";
+const local_pool = "0x54bC2fD3947c1A7427604C8C82d168dA7C6110b7";
 export const UNISWAP_SWAP_ROUTER = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 export const LOCAL_SWAP_ROUTER = "0x20Ce94F404343aD2752A2D01b43fa407db9E0D00";
 
@@ -38,51 +39,51 @@ async function syncPrice(pool) {
 
     console.log("chainlinkPrice: ", chainlinkPrice.toString());
 
-    var amountToSwap = 0;
-    var tokenIn = "";
-    var tokenOut = "";
+    var param = {
+        tokenIn: "",
+        tokenOut: "",
+        amountToSwap: 0
+    };
 
     // if the price is less, we want to increase the amount of token1 so that price of token0 will be higher.
     if (uniswapPrice < chainlinkPrice) {
-        amountToSwap = estimateTokensToSwap(
+        param.amountToSwap = estimateTokensToSwap(
             poolData.liquidity,
             chainlinkPrice,
             uniswapPrice,
             false
         );
-        console.log("amountToSwap", amountToSwap, "INPUT token(<): ", poolData.token1);
-        tokenIn = poolData.token1;
-        tokenOut = poolData.token0;
+        param.tokenIn = poolData.token1;
+        param.tokenOut = poolData.token0;
     } else {
-        amountToSwap = estimateTokensToSwap(
+        param.amountToSwap = estimateTokensToSwap(
             poolData.liquidity,
             chainlinkPrice,
             uniswapPrice,
             true
         );
-        console.log("amountToSwap", amountToSwap, "INPUT token: ", poolData.token0);
-        tokenIn = poolData.token0;
-        tokenOut = poolData.token1;
+        param.tokenIn = poolData.token0;
+        param.tokenOut = poolData.token1;
     }
+    console.log("amountToSwap", param.amountToSwap, "INPUT token: ", param.tokenIn);
 
-    if (amountToSwap.decimalPlaces(0)) {
-        console.log("amountToSwap: ", amountToSwap);
-        var amountOut = await swapExactInputSingleHop(
-            tokenIn,
-            tokenOut,
+    if (param.amountToSwap > 0) {
+        await swapExactInputSingleHop(
+            param.tokenIn,
+            param.tokenOut,
             poolData.fee,
-            amountToSwap.decimalPlaces(0).toString()
+            param.amountToSwap.toString()
         );
-
-        console.log("POOL SYNCHRONISED: ", amountOut);
-
         var poolData = await getPoolData(pool);
-
-        console.log("poolData: ", poolData);
-
-        var uniswapPrice = await getUniswapPrice(poolData.sqrtPriceX96, poolData.token0Decimal, poolData.token1Decimal);
-
-        console.log("uniswapPrice: ", uniswapPrice);
+        console.log("POOL SYNCHRONISED: ", poolData);
+        var amountOut = await swapExactInputSingleHop(
+            poolData.token0,
+            poolData.token1,
+            poolData.fee,
+            ethers.utils.parseUnits('1', poolData.token0Decimal).toString(),
+            true
+        );
+        console.log("1", poolData.token0Symbol, " = ", ethers.utils.formatUnits(amountOut, poolData.token1Decimal), poolData.token1Symbol);
     }
 }
 
