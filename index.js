@@ -13,7 +13,8 @@ dotenv.config();
 async function syncPrice(pool) {
   var poolData = await getPoolData(pool);
 
-  console.log("poolData: ", poolData);
+  console.log("token0: ", poolData.token0Symbol);
+  console.log("token1: ", poolData.token1Symbol);
 
   var uniswapPrice = await getUniswapPrice(
     poolData.sqrtPriceX96,
@@ -48,7 +49,7 @@ async function syncPrice(pool) {
     );
     param.tokenIn = poolData.token1;
     param.tokenOut = poolData.token0;
-  } else {
+  } else if (uniswapPrice > chainlinkPrice) {
     param.amountToSwap = estimateTokensToSwap(
       poolData.liquidity,
       chainlinkPrice,
@@ -58,51 +59,69 @@ async function syncPrice(pool) {
     param.tokenIn = poolData.token0;
     param.tokenOut = poolData.token1;
   }
-  console.log(
-    "amountToSwap",
-    param.amountToSwap,
-    "INPUT token: ",
-    param.tokenIn
-  );
-  // TEST`
-  param.amountToSwap = param.amountToSwap
-    .plus(param.amountToSwap.multipliedBy(0.0001))
-    .decimalPlaces(0);
-  console.log("amountToSwap", param.amountToSwap);
 
-  if (param.amountToSwap > 0 && false) {
+  if (param.amountToSwap > 0) {
+    param.amountToSwap = param.amountToSwap
+      .plus(param.amountToSwap.multipliedBy(0.01))
+      .decimalPlaces(0);
+    console.log("amountToSwap", param.amountToSwap);
+    var amountOut = await swapExactInputSingleHop(
+      poolData.token0,
+      poolData.token1,
+      poolData.fee,
+      ethers.utils.parseUnits("1", poolData.token0Decimal).toString(),
+      true
+    );
+    console.log(
+      "1",
+      poolData.token0Symbol,
+      " = ",
+      amountOut.toString(),
+      poolData.token1Symbol
+    );
     await swapExactInputSingleHop(
       param.tokenIn,
       param.tokenOut,
       poolData.fee,
-      param.amountToSwap.toString()
+      param.amountToSwap.toString(),
+      false
     );
-    var poolData = await getPoolData(pool);
-    console.log("POOL SYNCHRONISED: ", poolData);
+    console.log("POOL SYNCHRONISED!");
+    var amountOut = await swapExactInputSingleHop(
+      poolData.token0,
+      poolData.token1,
+      poolData.fee,
+      ethers.utils.parseUnits("1", poolData.token0Decimal).toString(),
+      true
+    );
+    console.log(
+      "1",
+      poolData.token0Symbol,
+      " = ",
+      amountOut.toString(),
+      poolData.token1Symbol
+    );
   }
-  var amountOut = await swapExactInputSingleHop(
-    poolData.token0,
-    poolData.token1,
-    poolData.fee,
-    ethers.utils.parseUnits("1", poolData.token0Decimal).toString(),
-    true
-  );
-  console.log(
-    "1",
-    poolData.token0Symbol,
-    " = ",
-    ethers.utils.formatUnits(amountOut, poolData.token1Decimal),
-    poolData.token1Symbol
-  );
+
+  return;
 }
 
 async function syncPools() {
-  // setInterval(async () => {
-  console.log("running");
-  for (let i = 0; i < pools.length; i++) {
-    console.log("syncing");
-    await syncPrice(pools[i]);
+  while (true) {
+    console.log("Running sync.........................");
+    for (let i = 0; i < pools.length; i++) {
+      console.log("Syncing: ", pools[i]);
+      try {
+        await syncPrice(pools[i]);
+        console.log("Sync done");
+      } catch (error) {
+        console.log("Error syncing:", error);
+      }
+    }
+    console.log("All pools synced!!!!!!!!!!!!!!!!!!!!!!!");
+
+    // Wait for 5 seconds before running again
+    await new Promise((resolve) => setTimeout(resolve, 60000 * 5));
   }
-  // }, 1000);
 }
 syncPools();

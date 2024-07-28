@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
 import { POOL_ABI } from "./abis/pool.js";
-import { ETH_PROVIDER, LOCAL_PROVIDER, USER, Wallet } from "./constansts.js";
+import { PROVIDER, USER, Wallet } from "./constansts.js";
 import { SWAP_ROUTER } from "./constansts.js";
 import { ERC20_ABI } from "./abis/erc20.js";
 import { aggregatorV3InterfaceABI } from "./abis/aggregator.js";
@@ -10,7 +10,7 @@ import BigNumber from "bignumber.js";
 BigNumber.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 });
 
 export async function getPoolData(poolAddress) {
-  var pool = new ethers.Contract(poolAddress, POOL_ABI, LOCAL_PROVIDER);
+  var pool = new ethers.Contract(poolAddress, POOL_ABI, PROVIDER);
 
   var token0 = await pool.token0();
   var token1 = await pool.token1();
@@ -20,8 +20,8 @@ export async function getPoolData(poolAddress) {
 
   var sqrtPriceX96 = slot0.sqrtPriceX96.toString();
 
-  var token0Contract = new ethers.Contract(token0, ERC20_ABI, LOCAL_PROVIDER);
-  var token1Contract = new ethers.Contract(token1, ERC20_ABI, LOCAL_PROVIDER);
+  var token0Contract = new ethers.Contract(token0, ERC20_ABI, PROVIDER);
+  var token1Contract = new ethers.Contract(token1, ERC20_ABI, PROVIDER);
   var token0Decimal = await token0Contract.decimals();
   var token1Decimal = await token1Contract.decimals();
   var token0Symbol = await token0Contract.symbol();
@@ -45,7 +45,7 @@ export async function getUniswapPrice(_sqrtPrice, decimal0, decimal1) {
   // Convert the input sqrtPrice to a BigNumber
   const sqrtPriceX96 = new BigNumber(_sqrtPrice);
 
-  console.log(sqrtPriceX96);
+  // console.log(sqrtPriceX96);
   // Square the sqrtPriceX96
 
   const sqrtPrice = sqrtPriceX96.dividedBy(new BigNumber("2").pow("96"));
@@ -74,12 +74,12 @@ export async function getChainlinkPrice(
   const priceFeedToken0 = new ethers.Contract(
     aggregatorToken0,
     aggregatorV3InterfaceABI,
-    ETH_PROVIDER
+    PROVIDER
   );
   const priceFeedToken1 = new ethers.Contract(
     aggregatorToken1,
     aggregatorV3InterfaceABI,
-    ETH_PROVIDER
+    PROVIDER
   );
 
   // Fetch latest round data for both tokens
@@ -148,10 +148,6 @@ export async function swapExactInputSingleHop(
 ) {
   var tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, Wallet);
 
-  console.log("before mint");
-  var tx = await tokenInContract.mint(amountIn);
-  await tx.wait();
-  console.log("after mint");
   tx = await tokenInContract.approve(SWAP_ROUTER, amountIn);
   await tx.wait();
   console.log("after approve");
@@ -160,31 +156,31 @@ export async function swapExactInputSingleHop(
     SWAP_ROUTER_ABI,
     Wallet
   );
-  var nonce = await Wallet.getTransactionCount();
-  console.log(nonce);
   var currentTimeStamp = Math.floor(Date.now() / 1000);
-  var amountOut;
+  var amountOut = 0;
   var params = {
     tokenIn: tokenIn,
     tokenOut: tokenOut,
     fee: poolFee,
     recipient: USER,
-    deadline: currentTimeStamp * 2,
+    deadline: currentTimeStamp * 10,
     amountIn: amountIn,
     amountOutMinimum: 0,
     sqrtPriceLimitX96: 0,
   };
-  console.log(params);
   if (callStatic) {
     amountOut = await swapRouter.callStatic.exactInputSingle(params, {
       gasLimit: 28000000,
-      nonce: ++nonce,
+      // nonce: ++nonce,
     });
   } else {
-    amountOut = await swapRouter.exactInputSingle(params, {
+    console.log("swapping===================================");
+    var nonce = await Wallet.getTransactionCount();
+    var tx = await swapRouter.exactInputSingle(params, {
       gasLimit: 28000000,
-      nonce: ++nonce,
+      nonce: nonce,
     });
+    await tx.wait();
   }
 
   return amountOut;
