@@ -1,6 +1,8 @@
 import { ethers } from "ethers";
 import { Wallet } from "../constansts.js";
 import { SWAP_ROUTER_ABI } from "../abis/swapRouter.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 var zeruOracleABI = [
   {
@@ -2411,14 +2413,13 @@ const nonFungiblePositionManagerABI = [
   },
 ];
 
-var Oracleaddress = "0xcfb7d601d354D9F3AE54d753a401D890161DD614";
-var factoryAddress = "0x8D1dB6db062c1a475c134E6BE08B0dF3F615173F";
-var uniswapV3AdapterAddress = "0x8409Bdf022b17A263b70cBaaB960656209c328C8";
-const nonFungiblePositionManager = "0x8D9E2c57c9dada8D56c8C07E308cB3b6015Ab3F1";
-const SWAP_ROUTER = "0x64794B90A5f0968adADAAAf72ee5c8AFf5Bc7895";
+var Oracleaddress = "0x7c91f08040e31AbDe32E11d6A9dA6db593531B77";
+var factoryAddress = "0x7c2C195CD6D34B8F845992d380aADB2730bB9C6F";
+var uniswapV3AdapterAddress = "0x440dC1674b3060D4134EAbd310C6eA9B5f153Ee8";
+const nonFungiblePositionManager = "0x500D1d6A4c7D8Ae28240b47c8FCde034D827fD5e";
+const SWAP_ROUTER = "0x20Ce94F404343aD2752A2D01b43fa407db9E0D00";
 
-var rpc =
-  "https://distinguished-maximum-sheet.bera-bartio.quiknode.pro/d4bb5c22aa0fee3b8d0c8702d9fb52a2eaa8e14c";
+var rpc = "http://127.0.0.1:8545/";
 var provider = new ethers.providers.JsonRpcProvider(rpc);
 
 var oracle = new ethers.Contract(Oracleaddress, zeruOracleABI, provider);
@@ -2443,10 +2444,10 @@ const nfpm = new ethers.Contract(
   Wallet
 );
 
-var wbera = "0x61b34Ac024035e815452047dA3B42b46D76339Dd";
-var honey = "0xf772481Eb5Cf6Fce7cDEE66c7033A555eCC32e34";
-var ibgt = "0xA42E0FcA91a8Ca871074C82023Bb68C5cC786B05";
-var usdt = "0xa0806D87B41bDA97e9efff4396EE42A6c40b0e86";
+var wbera = "0x07646cF55D06F93eB2Ccf099de8e768AEb84422b"; // 18
+var honey = "0x09bf24Fdf19F57bF1ab9b0aE8223e2954439C775"; // 18
+var ibgt = "0x4CfAD088b7b43f750232F77bD0Fc15b1eaC74D25"; // 18
+var usdt = "0xcDD7379d13638B496064324B9B067cF9034eC452"; // 6
 
 async function getAggregators() {
   console.log("aggregator WBERA: ", await oracle.getSourceOfAsset(wbera)); //
@@ -2454,21 +2455,17 @@ async function getAggregators() {
   console.log("aggregator IBGT: ", await oracle.getSourceOfAsset(ibgt)); //
   console.log("aggregator USDT: ", await oracle.getSourceOfAsset(usdt)); //
 }
-
+getAggregators();
 async function getAllPools() {
-  var tokens = [
-    "0x61b34Ac024035e815452047dA3B42b46D76339Dd",
-    "0xf772481Eb5Cf6Fce7cDEE66c7033A555eCC32e34",
-    "0xA42E0FcA91a8Ca871074C82023Bb68C5cC786B05",
-    "0xa0806D87B41bDA97e9efff4396EE42A6c40b0e86",
-  ];
+  var tokensName = ["wbera", "honey", "ibgt", "usdt"];
+  var tokens = [wbera, honey, ibgt, usdt];
   for (let i = 0; i < tokens.length; i++) {
     for (let j = 0; j < tokens.length; j++) {
       var token0 = tokens[i].toLowerCase();
       var token1 = tokens[j].toLowerCase();
       if (token0 != token1) {
         var pool = await uniswapFactory_contract.getPool(token0, token1, 100);
-        console.log(pool);
+        console.log(`${tokensName[i]}/${tokensName[j]}: `, pool);
       }
     }
   }
@@ -2547,25 +2544,123 @@ async function addLiquidityToPool() {
   console.log(tx);
 }
 
-async function Swap() {
-  var amountIn = ethers.utils.parseEther("100000");
+async function Swap(amount, callStatic, token0, token1, decimals) {
+  var amountIn = ethers.utils.parseUnits(amount.toString(), decimals);
 
-  var token0Contract = new ethers.Contract(wbera, erc20ABI, Wallet);
+  var token0Contract = new ethers.Contract(token0, erc20ABI, Wallet);
   await token0Contract.approve(swapRouter.address, amountIn);
 
   var params = {
-    tokenIn: wbera,
-    tokenOut: honey,
+    tokenIn: token0,
+    tokenOut: token1,
     fee: 100,
     recipient: Wallet.address,
     deadline: Date.now() * 10,
-    amountIn: amountIn,
+    amountIn: amountIn.toString(),
     amountOutMinimum: 0,
     sqrtPriceLimitX96: 0,
   };
-  var tx = await swapRouter.exactInputSingle(params, {
-    gasLimit: 28000000,
-  });
-  console.log(tx);
+  console.log(params);
+  var tx;
+  if (callStatic) {
+    tx = await swapRouter.callStatic.exactInputSingle(params);
+  } else {
+    tx = await swapRouter.exactInputSingle(params, {
+      gasLimit: 28000000,
+    });
+  }
+  console.log("tx: ", tx);
 }
-Swap();
+
+// HONEY/WBERA
+// Swap(100000, false, honey, wbera, 18);
+// WBERA/IBGT
+// Swap(100000, false, wbera, ibgt, 18);
+// WBERA/USDT
+// Swap(100000, false, wbera, usdt, 18);
+// HONEY/IBGT
+// Swap(100000, false, honey, ibgt, 18);
+// HONEY/USDT
+// Swap(100000, false, honey, usdt, 18);
+// IBGT/USDT
+// Swap(100000, false, ibgt, usdt, 18);
+
+/**
+ * wbera/honey:  0xf8E999b72aeAcbc39D797301F3090741518Ed18E
+ * wbera/ibgt:  0x76005906e4718F7008F51e2ED1071c392A363df7
+ * wbera/usdt:  0xD7713DF8b2e8Ff055A910be83eFef62484E8fa21
+ * honey/ibgt:  0xE679FCF83caF6C749737A765470F8C1EDbca560E
+ * honey/usdt:  0x9D377f2f98B4c9295dc37aC4d62A91dB3761F3cF
+ * ibgt/usdt:  0x325e9983Cc888078702C145a16DaDe9111b9b043
+ */
+
+async function decreaseLiquidity() {
+  var amount0 = ethers.utils.parseEther("100");
+  var amount1 = ethers.utils.parseEther("700");
+  var tokenId = 10;
+
+  var currentTick = 19460;
+  var upperTick = 19560;
+  var lowerTick = 19360;
+
+  var currentPrice = tickToSqrtPrice(currentTick);
+  var upperPrice = tickToSqrtPrice(upperTick);
+  var lowerPrice = tickToSqrtPrice(lowerTick);
+
+  var liquidity0 = getLiquidityForAmount0(currentPrice, upperPrice, amount0);
+  var liquidity1 = getLiquidityForAmount1(lowerPrice, currentPrice, amount1);
+
+  var liquidity = Math.min(liquidity0, liquidity1);
+
+  await nfpm.decreaseLiquidity({
+    tokenId: tokenId,
+    liquidity: liquidity,
+    amount0Min: "0",
+    amount1Min: "0",
+    deadline: Date.now() * 10,
+  });
+}
+
+function getLiquidityForAmount0(sqrtLower, sqrtUpper, amount) {
+  if (sqrtLower > sqrtUpper) {
+    var temp = sqrtLower;
+    sqrtLower = sqrtUpper;
+    sqrtUpper = temp;
+  }
+
+  var intermediate = (sqrtLower * sqrtUpper) / 2 ** 96;
+
+  return (amount * intermediate) / (sqrtUpper - sqrtLower);
+}
+
+function getLiquidityForAmount1(sqrtLower, sqrtUpper, amount) {
+  if (sqrtLower > sqrtUpper) {
+    var temp = sqrtLower;
+    sqrtLower = sqrtUpper;
+    sqrtUpper = temp;
+  }
+
+  return (amount * 2 ** 96) / (sqrtUpper - sqrtLower);
+}
+
+function tickToSqrtPrice(tick) {
+  return Math.sqrt(1.0001 ** tick) * 2 ** 96;
+}
+
+async function mintToSwapper() {
+  var tokens = [wbera, usdt, ibgt, honey];
+  var wallet = new ethers.Wallet(process.env.MINTER_PRIVATE_KEY, provider);
+  var wallet2 = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+  for (let i = 0; i < tokens.length; i++) {
+    var token = new ethers.Contract(tokens[i], erc20ABI, wallet);
+    var amount = 1000000000;
+    var decimals = await token.decimals();
+    var actualAmount = ethers.utils.parseUnits(amount.toString(), decimals);
+    console.log({ actualAmount });
+    await token.mint(actualAmount);
+    console.log("mint done!");
+    await token.transfer(wallet2.address, actualAmount);
+    console.log(i, " done!");
+  }
+}

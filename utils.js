@@ -174,7 +174,6 @@ export async function swapExactInputSingleHop(
       // nonce: ++nonce,
     });
   } else {
-    console.log("swapping===================================");
     var nonce = await Wallet.getTransactionCount();
     var tx = await swapRouter.exactInputSingle(params, {
       gasLimit: 28000000,

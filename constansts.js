@@ -2,13 +2,31 @@ import { ethers } from "ethers";
 import dotenv from "dotenv";
 dotenv.config();
 
-const RPC = process.env.BERA_RPC.toString();
-// const RPC = `http://127.0.0.1:8545/`;
+/**
+ * everything starting with main_ is mainnet data
+ * and everything starting with local_ is local deployment data (for testing)
+ */
 
-export const PROVIDER = new ethers.providers.JsonRpcProvider(RPC);
-export const Wallet = new ethers.Wallet(process.env.PRIVATE_KEY, PROVIDER);
-export const USER = "0xd4EeD53acbdF5bEBDF34eF1fD06b4aB2eCFA97d1";
-export const SWAP_ROUTER = "0x64794B90A5f0968adADAAAf72ee5c8AFf5Bc7895";
+const main_RPC = process.env.BERA_RPC.toString();
+const local_RPC = `http://127.0.0.1:8545/`;
+
+// mainnet
+const main_PROVIDER = new ethers.providers.JsonRpcProvider(main_RPC);
+const main_Wallet = new ethers.Wallet(process.env.PRIVATE_KEY, main_PROVIDER);
+const main_USER = "0xd4EeD53acbdF5bEBDF34eF1fD06b4aB2eCFA97d1";
+const main_SWAP_ROUTER = "0x5d0Dd3F446960d657799f1db0E52525D4b56304A";
+
+// local
+const local_PROVIDER = new ethers.providers.JsonRpcProvider(local_RPC);
+const local_Wallet = new ethers.Wallet(process.env.PRIVATE_KEY, local_PROVIDER);
+const local_USER = "0xd4EeD53acbdF5bEBDF34eF1fD06b4aB2eCFA97d1";
+const local_SWAP_ROUTER = "0x20Ce94F404343aD2752A2D01b43fa407db9E0D00";
+
+export const PROVIDER = main_PROVIDER;
+export const Wallet = main_Wallet;
+export const USER = main_USER;
+export const SWAP_ROUTER = main_SWAP_ROUTER;
+
 export const mainnet_aggregators = {
   // "symbol": "aggregator",
   WBTC: "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c",
@@ -20,31 +38,37 @@ export const mainnet_aggregators = {
   DAI: "0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9",
 };
 
-export const aggregators = {
-  WBERA: "0x083454b1Cf857fb496CCE721F9b1B8B35B9fb998",
-  HONEY: "0xc09FEB4869f703F3F4b16f3d19a654a8Bd2e179f",
-  IBGT: "0xF855Cf6a4F3e70834D766430dD7a5C80bF7052a2",
-  USDT: "0x05741d24cF8D22Dc534Bd44AA742A94c709bFc72",
-};
-
-export const pools = [
-  "0xbeA14f41bC38F95CAA852677973F554DaA72E764",
-  "0x8006f235233a69dB4af5Fc8f4eDC52EAb23F68da",
-  "0x61dA03d6d2Ca3b8d586b90a629aa652679F04b2B",
-  "0xaAD238E8639565b2f2786A5778237Ed9794504aa",
-  "0x2B03b10cD9dd161c303fde06851E769B8815AE4a",
-  "0x294868b837437fcD3F0Dd7351D27032E039DEaCd",
-];
-
 export const main_aggregators = {
-  wbera: "0x083454b1Cf857fb496CCE721F9b1B8B35B9fb998",
-  honey: "0xc09FEB4869f703F3F4b16f3d19a654a8Bd2e179f",
-  ibgt: "0xF855Cf6a4F3e70834D766430dD7a5C80bF7052a2",
+  WBERA: "0xAc3623B5aFF1A9E1DD0ECe4c2aFF6E9a8EE9a46C",
+  HONEY: "0x90c15167CB904b601E6660E86E464476b0B40150",
+  IBGT: "0x9C9de5ac3cd8dA21cE9D9cca0aF898F796DE6039",
+  USDT: "0xa4869121CBff015024d4342df4c5e55e281b1B94",
 };
 
 export const main_pools = [
-  "0x8ce6629F925D57F69Eefe223bf8dEb68374d285D",
-  "0xc86dDe9f0dDAe989D00bbbe4f36d777C4A2da5A9",
-  "0xF7d9494BB4424dE5C99665637E4E82068DC811A9",
-  "0x7743f5b504bFd9a81e23187dc6f334e296d70E54",
+  "0x813619ebab0051F59EC8d298088fc34D290E9258",
+  "0xdB084D29FC38FCE5e9922e4CE3eDAFdb11cDBA39",
+  "0xb5927E8013B12F9d7122cd7A6Db96F231AFF84e0",
+  "0x1664CEFA076E76deF1a0f9560e25Ed7901c2e379",
+  "0xD8C074491ae9FE6EFCd2E940c6b30DB3969c06b6",
+  "0xBb29a8dE0D86279f7b057043C7f15D63D350f318",
 ];
+
+export const local_aggregators = {
+  WBERA: "0x377EE3A9fbdc642CD7E8d1B72Fb181d45091730B",
+  HONEY: "0xd5a2fD5000b6F2dc3be3adA80415C68af1023F1a",
+  IBGT: "0x17dc08d736669ba7Ff65EAD67a809519E36f311C",
+  USDT: "0x0A3095eB06F507E1a4854d48169389629F0600EF",
+};
+
+export const local_pools = [
+  "0x6202EF6c04EE00382406d1dd2c6F57F084aDa0De",
+  "0x2d097Cf9DBAdaEE0542bcc81e6E8C8f721D7e5F5",
+  "0x466Cb2ED05174d40a14F9Dd655d9D77e365b5200",
+  "0x1aCE1677eD84A8aA5D2e2a23D4A5A3BB32fae322",
+  "0xb8ca670C678cD2346be390bE69Cd3d1c35A2a376",
+  "0x033CfEF63c6550cf4591F493f2fA9E2af3d9467b",
+];
+
+export const aggregators = main_aggregators;
+export const pools = main_pools;
